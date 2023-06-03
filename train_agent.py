@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 
 from replay_buffer import ReplayBuffer
 from conservative_q_learning import ConservativeDeepQNetworkAgent
+from utils.parse_args import parse_args
 
+import yaml
 
 def perform_rollouts(env, agent, nb_episodes, replay_buffer=None, render=False):
 
@@ -66,19 +68,19 @@ def perform_rollouts(env, agent, nb_episodes, replay_buffer=None, render=False):
     return replay_buffer, avg_reward, std_reward, success_rate
 
 
-def train_agent(env, agent, expert_agent, replay_buffer, rollout_episodes, training_iters):
+def train_agent(env, agent, expert_agent, replay_buffer, rollout_episodes, training_iters, exp_name):
 
     tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec = [], [], [], []
     _, (axes) = plt.subplots(1, 2, figsize=(12,4))
     
-    demonstrations, _, _, _ = perform_rollouts(env, expert_agent, rollout_episodes, replay_buffer, True)
+    demonstrations, _, _, _ = perform_rollouts(env, expert_agent, rollout_episodes, replay_buffer, True) # demonstrations = replay_buffer
     
     for iter_nb in range(training_iters + 1):
-        batch = replay_buffer.sample_transitions()
-        agent.update(batch)
+        batch = replay_buffer.sample_transitions() # demonstratinos = replay_buffer?
+        agent.update(batch) # update agent
 
         if (iter_nb % 1000) == 0:
-            agent.replace_target_network()
+            agent.replace_target_network() # replace target q_network
             
             # use render = False to speed up the training process
             _, avg_reward, std_reward, success_rate = perform_rollouts(env, agent, 100, None, False)
@@ -88,7 +90,7 @@ def train_agent(env, agent, expert_agent, replay_buffer, rollout_episodes, train
             sr_vec.append(success_rate)
             plot_training_metrics(axes, tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec)
     
-    save_metrics(tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec)
+    save_metrics(tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec, exp_name = exp_name)
 
 
 def plot_training_metrics(axes, tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec):
@@ -105,8 +107,8 @@ def plot_training_metrics(axes, tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec):
     plt.pause(0.05)
 
 
-def save_metrics(tr_iters_vec, avg_reward_vec, std_reward_vec, sr_vec):
-    with open('metrics'+datetime.datetime.now().strftime('%H:%M:%S')+'.csv', 'w') as csv_file:
+def save_metrics(tr_iters_vec, avg_reward_vec, std_reward_vec, sr_vec, exp_name):
+    with open(f'metrics/{exp_name}.csv', 'w') as csv_file:
         csv_writer = csv.writer(csv_file, delimiter='\t')
         csv_writer.writerow(['steps', 'avg_reward', 'std_reward'])
         for i in range(len(tr_iters_vec)):
@@ -115,13 +117,20 @@ def save_metrics(tr_iters_vec, avg_reward_vec, std_reward_vec, sr_vec):
         
 if __name__ == '__main__':
 
-    env_name = 'CartPole-v0'
+    args = parse_args()
+
+    env_name = args['env_name']
     env = gym.make(env_name)
 
     if env_name == 'CartPole-v0':
         from experts.pid_controller import PIDController
         # Complete using P1
-        expert_agent = PIDController(0.0, 0, 0.0, 0.02)
+        
+        # load PID params
+        with open(f"experts/params/pid_parameters.yaml", 'r') as file:
+            pid_params = yaml.safe_load(file)
+        
+        expert_agent = PIDController(**pid_params, dt = 0.02)
     
     elif env_name == 'MountainCar-v0':
         from experts.mcar_policy import MCarExpertPolicy
@@ -133,8 +142,8 @@ if __name__ == '__main__':
     nb_states = env.observation_space.shape[0]
     nb_actions = env.action_space.n
     
-    agent = ConservativeDeepQNetworkAgent(dim_states=nb_states, dim_actions=nb_actions, lr=0.01, gamma=0.99, alpha=20.0)
+    agent = ConservativeDeepQNetworkAgent(dim_states=nb_states, dim_actions=nb_actions, lr=0.01, gamma=0.99, alpha=args['alpha'])
     replay_buffer = ReplayBuffer(dim_states=nb_states, dim_actions=nb_actions, max_size=100000, sample_size=128)
 
     train_agent(env=env, agent=agent, expert_agent=expert_agent, 
-                replay_buffer=replay_buffer, rollout_episodes=200, training_iters=20000)
+                replay_buffer=replay_buffer, rollout_episodes=args['nb_rollouts'], training_iters=20000, exp_name = args['exp_name'])

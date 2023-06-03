@@ -1,4 +1,3 @@
-import time
 import numpy as np
 
 def test_agent(env, agent, nb_episodes=30):
