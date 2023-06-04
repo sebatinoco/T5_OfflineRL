@@ -4,16 +4,56 @@ import time
 import os
 import torch
 
+import optuna
+from optuna.samplers import TPESampler
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+from experts.pid_controller import PIDController
 from replay_buffer import ReplayBuffer
 from conservative_q_learning import ConservativeDeepQNetworkAgent
 from utils.run_args import run_args
+from utils.plot_experiment import plot_experiment
+from utils.test_agent import test_agent
 from train_agent import train_agent
 
 if __name__ == '__main__':
 
+    ##### PART I #####
+    # parameters of optimization
+    env = gym.make('CartPole-v0')
+    n_trials = 100
+
+    # function to optimize
+    def objective(trial):
+        params = {
+            "kp": trial.suggest_float("kp", -1, 1),
+            "ki": trial.suggest_float("ki", -1, 1),
+            "kd": trial.suggest_float("kd", -1, 1),
+        }
+        
+        agent = PIDController(**params)
+        
+        return test_agent(env, agent)
+        
+    # optimize parameters
+    study = optuna.create_study(direction = 'maximize', sampler = TPESampler(seed = 3381))
+    study.optimize(objective, n_trials = n_trials, show_progress_bar = True)
+
+    # print results
+    best_trial = study.best_trial
+    print(f'Best params: {best_trial.params}')
+    print(f'Best score: {best_trial.value}')
+
+    # export parameters
+    with open('experts/params/pid_parameters.yaml', 'w') as outfile:
+        yaml.dump(best_trial.params, outfile, default_flow_style=False)
+        
+    ##### PART II #####
+
     # load run args
     r_args = run_args() 
     
+    train = r_args['train']
     filter_env = r_args['env']
     filter_config = r_args['filter_config']
     n_trials = r_args['n_trials']
@@ -34,41 +74,53 @@ if __name__ == '__main__':
 
     print('Running experiments on the following configs: ', configs)
 
-    for trial in range(1, n_trials + 1):
-        start_time = time.time()
-        # for every config file
-        for config in configs:
-            # load config
-            with open(f"configs/{config}", 'r') as file:
-                args = yaml.safe_load(file)
+    if train:
+        for trial in range(1, n_trials + 1):
+            start_time = time.time()
+            # for every config file
+            for config in configs:
+                # load config
+                with open(f"configs/{config}", 'r') as file:
+                    args = yaml.safe_load(file)
 
-            # experiment name
-            exp_name = f"{args['env'][:-3]}_{args['exp_id']}_{trial}"
+                # experiment name
+                exp_name = f"{args['env'][:-3]}_{args['exp_id']}_{trial}"
 
-            env_name = args['env']
-            env = gym.make(env_name)
-            
-            if env_name == 'CartPole-v0':
-                from experts.pid_controller import PIDController
+                env_name = args['env']
+                env = gym.make(env_name)
                 
-                # load PID params
-                with open(f"experts/params/pid_parameters.yaml", 'r') as file:
-                    pid_params = yaml.safe_load(file)
+                if env_name == 'CartPole-v0':
+                    from experts.pid_controller import PIDController
+                    
+                    # load PID params
+                    with open(f"experts/params/pid_parameters.yaml", 'r') as file:
+                        pid_params = yaml.safe_load(file)
+                    
+                    expert_agent = PIDController(**pid_params, dt = 0.02)
                 
-                expert_agent = PIDController(**pid_params, dt = 0.02)
-            
-            elif env_name == 'MountainCar-v0':
-                from experts.mcar_policy import MCarExpertPolicy
-                expert_agent = MCarExpertPolicy()
+                elif env_name == 'MountainCar-v0':
+                    from experts.mcar_policy import MCarExpertPolicy
+                    expert_agent = MCarExpertPolicy()
 
-            else: 
-                raise NotImplementedError()
+                else: 
+                    raise NotImplementedError()
 
-            nb_states = env.observation_space.shape[0]
-            nb_actions = env.action_space.n
-            
-            agent = ConservativeDeepQNetworkAgent(dim_states=nb_states, dim_actions=nb_actions, lr=0.01, gamma=0.99, alpha=args['alpha'], device = device)
-            replay_buffer = ReplayBuffer(dim_states=nb_states, dim_actions=nb_actions, max_size=100000, sample_size=128)
+                nb_states = env.observation_space.shape[0]
+                nb_actions = env.action_space.n
+                
+                agent = ConservativeDeepQNetworkAgent(dim_states=nb_states, dim_actions=nb_actions, lr=0.01, gamma=0.99, alpha=args['alpha'], device = device)
+                replay_buffer = ReplayBuffer(dim_states=nb_states, dim_actions=nb_actions, max_size=100000, sample_size=128)
 
-            train_agent(env=env, agent=agent, expert_agent=expert_agent, 
-                        replay_buffer=replay_buffer, rollout_episodes=args['nb_rollouts'], training_iters=20000, exp_name = exp_name)
+                train_agent(env=env, agent=agent, expert_agent=expert_agent, 
+                            replay_buffer=replay_buffer, rollout_episodes=args['nb_rollouts'], training_iters=20000, exp_name = exp_name)
+                
+            execution_time = time.time() - start_time
+
+            print(f'{execution_time:.2f} seconds -- {(execution_time/60):.2f} minutes -- {(execution_time/3600):.2f} hours')
+        
+    # plot experiments
+    configs = [config.replace('.yaml', '') for config in configs]
+
+    # plot for each experiment
+    for config in configs:
+        plot_experiment(config)

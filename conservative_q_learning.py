@@ -53,7 +53,7 @@ class ConservativeDeepQNetworkAgent:
 
         # Select action greedily
         with torch.no_grad():
-            action = self._deep_qnetwork(torch.from_numpy(np.array(observation, dtype=np.float32))).argmax().numpy()
+            action = self._deep_qnetwork(torch.from_numpy(np.array(observation, dtype=np.float32)).to(self._device)).argmax().cpu().numpy()
 
         return action
 

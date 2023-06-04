@@ -72,7 +72,7 @@ def train_agent(env, agent, expert_agent, replay_buffer, rollout_episodes, train
     tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec = [], [], [], []
     _, (axes) = plt.subplots(1, 2, figsize=(12,4))
     
-    demonstrations, _, _, _ = perform_rollouts(env, expert_agent, rollout_episodes, replay_buffer, True) # demonstrations = replay_buffer
+    demonstrations, _, _, _ = perform_rollouts(env, expert_agent, rollout_episodes, replay_buffer, False) # demonstrations = replay_buffer
     
     for iter_nb in range(training_iters + 1):
         batch = replay_buffer.sample_transitions() # demonstratinos = replay_buffer?
@@ -88,6 +88,9 @@ def train_agent(env, agent, expert_agent, replay_buffer, rollout_episodes, train
             std_rew_vec.append(std_reward)
             sr_vec.append(success_rate)
             plot_training_metrics(axes, tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec)
+    
+    plt.savefig(f'figures/experiments/{exp_name}.pdf')
+    plt.close()
     
     save_metrics(tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec, exp_name = exp_name)
 
@@ -109,7 +112,7 @@ def plot_training_metrics(axes, tr_iters_vec, avg_rew_vec, std_rew_vec, sr_vec):
 def save_metrics(tr_iters_vec, avg_reward_vec, std_reward_vec, sr_vec, exp_name):
     with open(f'metrics/{exp_name}.csv', 'w') as csv_file:
         csv_writer = csv.writer(csv_file, delimiter='\t')
-        csv_writer.writerow(['steps', 'avg_reward', 'std_reward'])
+        csv_writer.writerow(['steps', 'avg_reward', 'std_reward', 'success_rate'])
         for i in range(len(tr_iters_vec)):
             csv_writer.writerow([tr_iters_vec[i], avg_reward_vec[i], std_reward_vec[i], sr_vec[i]])
 
