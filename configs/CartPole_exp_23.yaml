@@ -1,0 +1,4 @@
+env: CartPole-v0
+exp_id: exp_23
+nb_rollouts: 100
+alpha: 10.0

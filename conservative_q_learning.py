@@ -25,7 +25,7 @@ class DeepQNetwork(nn.Module):
 
 class ConservativeDeepQNetworkAgent:
 
-    def __init__(self, dim_states, dim_actions, lr, gamma, alpha):
+    def __init__(self, dim_states, dim_actions, lr, gamma, alpha, device = 'cpu'):
         
         self._learning_rate = lr
         self._gamma = gamma
@@ -34,10 +34,12 @@ class ConservativeDeepQNetworkAgent:
         self._dim_states = dim_states
         self._dim_actions = dim_actions
 
-        self._deep_qnetwork = DeepQNetwork(self._dim_states, self._dim_actions)
+        self._deep_qnetwork = DeepQNetwork(self._dim_states, self._dim_actions).to(device)
         self._target_deepq_network = copy.deepcopy(self._deep_qnetwork)
 
         self._optimizer = torch.optim.Adam(self._deep_qnetwork.parameters(), lr=self._learning_rate)
+        
+        self._device = device
 
 
     def replace_target_network(self):
@@ -61,11 +63,11 @@ class ConservativeDeepQNetworkAgent:
         s_t_batch, a_t_batch, r_t_batch, s_t1_batch, done_t_batch = experiences_batch # numpy arrays
 
 
-        s_t_batch = torch.tensor(s_t_batch)
-        a_t_batch = torch.tensor(a_t_batch).unsqueeze(1).long()
-        r_t_batch = torch.tensor(r_t_batch)
-        s_t1_batch = torch.tensor(s_t1_batch)
-        done_t_batch = torch.tensor(done_t_batch)
+        s_t_batch = torch.tensor(s_t_batch, device = self._device)
+        a_t_batch = torch.tensor(a_t_batch, device = self._device).unsqueeze(1).long()
+        r_t_batch = torch.tensor(r_t_batch, device = self._device)
+        s_t1_batch = torch.tensor(s_t1_batch, device = self._device)
+        done_t_batch = torch.tensor(done_t_batch, device = self._device)
 
         # P2 - 1
         
@@ -80,10 +82,6 @@ class ConservativeDeepQNetworkAgent:
         self._optimizer.zero_grad()
         # CQL1 loss (check the paper)
         # hint: use torch.logsumexp
-        #c_target = 0
-
-        #loss = DQN_loss + self._alpha * c_target # DQN loss + self._alpha * c_target
-        
         c_target = torch.logsumexp(self._deep_qnetwork(s_t_batch), dim=1)
 
         loss = DQN_loss + self._alpha * c_target.mean()  # DQN loss + self._alpha * c_target

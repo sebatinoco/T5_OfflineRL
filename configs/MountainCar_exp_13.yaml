@@ -1,0 +1,4 @@
+env: MountainCar-v0
+exp_id: exp_13
+nb_rollouts: 10
+alpha: 10.0
