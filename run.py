@@ -29,8 +29,8 @@ if __name__ == '__main__':
         env_configs = [config for config in configs if len(set(filter_env) & set(config.split('_'))) > 0] # filter by environment
         filtered_configs = [config for config in configs if config in filter_config] # filter by config
         
-        final_configs = set(env_configs + filtered_configs) # filtered configs
-        configs = [config for config in configs if config in final_configs] # filter configs
+        final_configs = set(env_configs + filtered_configs) # filter configs
+        configs = [config for config in configs if config in final_configs] # apply filter
 
     print('Running experiments on the following configs: ', configs)
 
