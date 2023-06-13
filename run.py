@@ -8,12 +8,12 @@ import optuna
 from optuna.samplers import TPESampler
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-from experts.pid_controller import PIDController
+from experts.pid_controller import PIDController, test_agent
 from replay_buffer import ReplayBuffer
 from conservative_q_learning import ConservativeDeepQNetworkAgent
 from utils.run_args import run_args
 from utils.plot_experiment import plot_experiment
-from utils.test_agent import test_agent
+from utils.get_score import get_score
 from train_agent import train_agent
 
 if __name__ == '__main__':
@@ -33,7 +33,7 @@ if __name__ == '__main__':
         
         agent = PIDController(**params)
         
-        return test_agent(env, agent)
+        return get_score(env, agent)
         
     # optimize parameters
     study = optuna.create_study(direction = 'maximize', sampler = TPESampler(seed = 3381))
@@ -47,6 +47,12 @@ if __name__ == '__main__':
     # export parameters
     with open('experts/params/pid_parameters.yaml', 'w') as outfile:
         yaml.dump(best_trial.params, outfile, default_flow_style=False)
+        
+    print('Testing CartPole Expert')
+    pid_agent = PIDController(**best_trial.params)
+    test_agent(env, pid_agent)
+    
+    time.sleep(3)
         
     ##### PART II #####
 

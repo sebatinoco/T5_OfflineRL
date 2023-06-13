@@ -62,7 +62,6 @@ class ConservativeDeepQNetworkAgent:
 
         s_t_batch, a_t_batch, r_t_batch, s_t1_batch, done_t_batch = experiences_batch # numpy arrays
 
-
         s_t_batch = torch.tensor(s_t_batch, device = self._device)
         a_t_batch = torch.tensor(a_t_batch, device = self._device).unsqueeze(1).long()
         r_t_batch = torch.tensor(r_t_batch, device = self._device)
@@ -70,11 +69,12 @@ class ConservativeDeepQNetworkAgent:
         done_t_batch = torch.tensor(done_t_batch, device = self._device)
 
         # P2 - 1
-        
         with torch.no_grad():
             target = self._target_deepq_network(s_t1_batch).max(dim = 1).values
 
-        y_pred = self._deep_qnetwork(s_t_batch).gather(1, a_t_batch).squeeze() 
+        old_Q = self._deep_qnetwork(s_t_batch)
+        
+        y_pred = old_Q.gather(1, a_t_batch).squeeze() 
         y_target = r_t_batch + self._gamma * target * (1 - done_t_batch)
 
         DQN_loss = F.mse_loss(y_pred, y_target)
@@ -82,9 +82,9 @@ class ConservativeDeepQNetworkAgent:
         self._optimizer.zero_grad()
         # CQL1 loss (check the paper)
         # hint: use torch.logsumexp
-        c_target = torch.logsumexp(self._deep_qnetwork(s_t_batch), dim=1)
+        c_target = torch.logsumexp(old_Q, dim=1).mean() - y_pred.mean()
 
-        loss = DQN_loss + self._alpha * c_target.mean()  # DQN loss + self._alpha * c_target
+        loss = 0.5 * DQN_loss + self._alpha * c_target  # DQN loss + self._alpha * c_target
 
         loss.backward()
 

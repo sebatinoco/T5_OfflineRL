@@ -42,7 +42,7 @@ class PIDController:
         return 0 if ctrl < 0 else 1
 
 
-def test_agent(env, agent, nb_episodes=30, render=True):
+def test_agent(env, agent, nb_episodes=30, render=False):
 
     ep_rewards = []
     success_rate = 0

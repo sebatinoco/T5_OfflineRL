@@ -1,6 +1,6 @@
 import numpy as np
 
-def test_agent(env, agent, nb_episodes=30):
+def get_score(env, agent, nb_episodes=30):
 
     ep_rewards = []
     success_rate = 0
