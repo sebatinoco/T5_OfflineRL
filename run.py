@@ -4,52 +4,25 @@ import time
 import os
 import torch
 
-import optuna
-from optuna.samplers import TPESampler
-optuna.logging.set_verbosity(optuna.logging.WARNING)
-
 from experts.pid_controller import PIDController, test_agent
 from replay_buffer import ReplayBuffer
 from conservative_q_learning import ConservativeDeepQNetworkAgent
 from utils.run_args import run_args
 from utils.plot_experiment import plot_experiment
-from utils.get_score import get_score
+from utils.optimize_pid import optimize_pid
 from train_agent import train_agent
 
 if __name__ == '__main__':
 
     ##### PART I #####
-    # parameters of optimization
-    env = gym.make('CartPole-v0')
-    n_trials = 100
-
-    # function to optimize
-    def objective(trial):
-        params = {
-            "kp": trial.suggest_float("kp", -1, 1),
-            "ki": trial.suggest_float("ki", -1, 1),
-            "kd": trial.suggest_float("kd", -1, 1),
-        }
-        
-        agent = PIDController(**params)
-        
-        return get_score(env, agent)
-        
+    
     # optimize parameters
-    study = optuna.create_study(direction = 'maximize', sampler = TPESampler(seed = 3381))
-    study.optimize(objective, n_trials = n_trials, show_progress_bar = True)
-
-    # print results
-    best_trial = study.best_trial
-    print(f'Best params: {best_trial.params}')
-    print(f'Best score: {best_trial.value}')
-
-    # export parameters
-    with open('experts/params/pid_parameters.yaml', 'w') as outfile:
-        yaml.dump(best_trial.params, outfile, default_flow_style=False)
+    best_params = optimize_pid()
         
+    # test PID on CartPole
     print('Testing CartPole Expert')
-    pid_agent = PIDController(**best_trial.params)
+    env = gym.make('CartPole-v0')
+    pid_agent = PIDController(**best_params)
     test_agent(env, pid_agent)
     
     time.sleep(3)

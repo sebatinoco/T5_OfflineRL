@@ -75,7 +75,7 @@ def train_agent(env, agent, expert_agent, replay_buffer, rollout_episodes, train
     demonstrations, _, _, _ = perform_rollouts(env, expert_agent, rollout_episodes, replay_buffer, False) # demonstrations = replay_buffer
     
     for iter_nb in range(training_iters + 1):
-        batch = replay_buffer.sample_transitions() # demonstratinos = replay_buffer?
+        batch = replay_buffer.sample_transitions() 
         agent.update(batch) # update agent
 
         if (iter_nb % 1000) == 0:
